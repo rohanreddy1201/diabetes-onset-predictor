@@ -3,8 +3,9 @@ import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, roc_curve
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, confusion_matrix
 
 # Load the models
 lr_model = joblib.load('logistic_regression_model.pkl')
@@ -50,7 +51,7 @@ st.write(f'Random Forest Prediction: {"Diabetic" if rf_prediction[0] else "Non-D
 
 # Display various graphs
 st.subheader('Data Overview')
-st.write(df.describe())
+st.write(df.describe().iloc[:, :5])
 
 st.subheader('Correlation Heatmap')
 fig, ax = plt.subplots(figsize=(10, 8))
@@ -64,13 +65,16 @@ ax.set_xlabel('Outcome')
 ax.set_ylabel('Count')
 st.pyplot(fig)
 
-st.subheader('Scatter Plots')
-features = ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'Age']
-for feature in features:
-    fig, ax = plt.subplots()
-    sns.scatterplot(x=df[feature], y=df['Outcome'], ax=ax)
-    ax.set_title(f'Outcome vs {feature}')
-    st.pyplot(fig)
+# Split pairplots into two separate plots for better readability
+st.subheader('Pairplot of First Half of Features')
+pairplot_features_1 = df.columns[:4]
+fig = sns.pairplot(df, vars=pairplot_features_1, hue='Outcome', markers=["o", "s"])
+st.pyplot(fig)
+
+st.subheader('Pairplot of Second Half of Features')
+pairplot_features_2 = df.columns[4:8]
+fig = sns.pairplot(df, vars=pairplot_features_2, hue='Outcome', markers=["o", "s"])
+st.pyplot(fig)
 
 # Performance Metrics
 X = df.drop('Outcome', axis=1)
@@ -83,6 +87,8 @@ st.subheader('Model Performance Comparison')
 lr_probs = lr_model.predict_proba(X_test)[:, 1]
 lr_auc = roc_auc_score(y_test, lr_probs)
 lr_fpr, lr_tpr, _ = roc_curve(y_test, lr_probs)
+lr_cm = confusion_matrix(y_test, lr_model.predict(X_test))
+lr_cm_norm = lr_cm.astype('float') / lr_cm.sum(axis=1)[:, np.newaxis]
 
 st.write('### Logistic Regression Performance')
 st.write(f'Accuracy: {accuracy_score(y_test, lr_model.predict(X_test)):.2f}')
@@ -98,10 +104,19 @@ ax.set_ylabel('True Positive Rate')
 ax.legend()
 st.pyplot(fig)
 
+fig, ax = plt.subplots()
+sns.heatmap(lr_cm_norm, annot=True, fmt='.2f', cmap='Blues', ax=ax)
+ax.set_title('Confusion Matrix - Logistic Regression')
+ax.set_xlabel('Predicted')
+ax.set_ylabel('Actual')
+st.pyplot(fig)
+
 # Random Forest Metrics
 rf_probs = rf_model.predict_proba(X_test)[:, 1]
 rf_auc = roc_auc_score(y_test, rf_probs)
 rf_fpr, rf_tpr, _ = roc_curve(y_test, rf_probs)
+rf_cm = confusion_matrix(y_test, rf_model.predict(X_test))
+rf_cm_norm = rf_cm.astype('float') / rf_cm.sum(axis=1)[:, np.newaxis]
 
 st.write('### Random Forest Performance')
 st.write(f'Accuracy: {accuracy_score(y_test, rf_model.predict(X_test)):.2f}')
@@ -115,4 +130,11 @@ ax.plot(rf_fpr, rf_tpr, marker='.', label='Random Forest (AUC = %0.2f)' % rf_auc
 ax.set_xlabel('False Positive Rate')
 ax.set_ylabel('True Positive Rate')
 ax.legend()
+st.pyplot(fig)
+
+fig, ax = plt.subplots()
+sns.heatmap(rf_cm_norm, annot=True, fmt='.2f', cmap='Blues', ax=ax)
+ax.set_title('Confusion Matrix - Random Forest')
+ax.set_xlabel('Predicted')
+ax.set_ylabel('Actual')
 st.pyplot(fig)
